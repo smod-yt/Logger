@@ -1,6 +1,6 @@
 import React from "react";
 import { Tabs } from "@heroui/react";
-import { LayoutDashboard, History, Clock, List, DatabaseBackup } from "lucide-react";
+import { LayoutDashboard, History, Clock, List, DatabaseBackup, Settings } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 
 export default function Header({ activeTab, setActiveTab, isDarkMode, toggleTheme }) {
@@ -55,6 +55,13 @@ export default function Header({ activeTab, setActiveTab, isDarkMode, toggleThem
                 <div className="flex items-center gap-2">
                   <DatabaseBackup size={16} />
                   <span>Бэкапы</span>
+                </div>
+                <Tabs.Indicator />
+              </Tabs.Tab>
+              <Tabs.Tab id="settings">
+                <div className="flex items-center gap-2">
+                  <Settings size={16} />
+                  <span>Настройки</span>
                 </div>
                 <Tabs.Indicator />
               </Tabs.Tab>

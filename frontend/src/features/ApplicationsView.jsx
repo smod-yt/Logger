@@ -569,6 +569,16 @@ export default function ApplicationsView() {
                   </p>
                 </div>
 
+                <div className="p-3 bg-primary-500/10 border border-primary-500/20 rounded-xl flex items-start gap-3">
+                  <Info className="size-5 text-primary shrink-0 mt-0.5" />
+                  <p className="text-xs text-default-600 leading-relaxed">
+                    <span className="font-semibold text-primary">⚠️ В списке отображаются только те приложения, которые запускались хотя бы один раз.</span>
+                    <span className="block mt-1">
+                      Если нужного приложения нет — нажмите «Добавить выбранные (0)» без выбора — через некоторое время список обновится автоматически.
+                    </span>
+                  </p>
+                </div>
+
                 {isLoadingNewApps ? (
                   <div className="py-12 flex justify-center">
                     <Spinner size="md" color="primary" label="Загрузка списка..." />
@@ -617,9 +627,12 @@ export default function ApplicationsView() {
                 </Button>
                 <Button 
                   color="primary" 
-                  isDisabled={newApps.length === 0} 
                   isLoading={isRegistering} 
-                  onPress={handleRegisterApps}
+                  onPress={
+                    selectedNewAppIds.length === 0
+                      ? fetchNewApps
+                      : handleRegisterApps
+                  }
                 >
                   Добавить выбранные ({selectedNewAppIds.length})
                 </Button>
