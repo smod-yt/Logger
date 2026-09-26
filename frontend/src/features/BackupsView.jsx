@@ -49,6 +49,7 @@ export default function BackupsView() {
 
   const [backupToDelete, setBackupToDelete] = useState(null);
   const [backupToRestore, setBackupToRestore] = useState(null);
+  const [isDeleteOldOpen, setIsDeleteOldOpen] = useState(false);
 
   const [typeFilter, setTypeFilter] = useState("all");
   const [period, setPeriod] = useState("all");
@@ -255,6 +256,43 @@ export default function BackupsView() {
     }
   };
 
+  const handleConfirmDeleteOld = async () => {
+    try {
+      setActionLoading("delete-old");
+      setIsDeleteOldOpen(false);
+
+      const res = await fetch("/api/backups/delete-old", {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        let errorMessage = `Ошибка ${res.status}`;
+        try {
+          const errData = await res.json();
+          if (errData.detail) {
+            errorMessage = Array.isArray(errData.detail)
+              ? errData.detail.map((e) => `${e.loc?.join(".") || "field"}: ${e.msg}`).join(" | ")
+              : String(errData.detail);
+          } else {
+            errorMessage = JSON.stringify(errData);
+          }
+        } catch (_) {
+          const text = await res.text().catch(() => "");
+          if (text) errorMessage = text;
+        }
+        throw new Error(errorMessage);
+      }
+
+      await fetchBackups();
+    } catch (error) {
+      console.error("Ошибка при удалении старых бэкапов:", error);
+      const msg = error instanceof Error ? error.message : String(error);
+      alert(`Не удалось удалить старые бэкапы: ${msg}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handlePeriodChange = (key) => {
     const cleanKey = key ? String(key) : "all";
     setPeriod(cleanKey);
@@ -332,6 +370,28 @@ export default function BackupsView() {
           >
             <RefreshCw className="size-4" />
           </Button>
+
+          <Button
+            variant="flat"
+            color="danger"
+            size="md"
+            className="font-medium"
+            onPress={() => setIsDeleteOldOpen(true)}
+            isDisabled={
+              Boolean(actionLoading) ||
+              backups.length <= 1
+            }
+            startContent={
+              actionLoading === "delete-old" ? (
+                <Spinner size="sm" color="danger" />
+              ) : (
+                <Trash2 className="size-4" />
+              )
+            }
+          >
+            Удалить старые
+          </Button>
+
           <Button 
             color="primary" 
             size="md"
@@ -660,6 +720,34 @@ export default function BackupsView() {
                 </Button>
                 <Button color="primary" onPress={handleConfirmRestore}>
                   Восстановить
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
+
+      <AlertDialog isOpen={isDeleteOldOpen} onClose={() => setIsDeleteOldOpen(false)}>
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container>
+            <AlertDialog.Dialog className="sm:max-w-[400px]">
+              <AlertDialog.CloseTrigger onPress={() => setIsDeleteOldOpen(false)} />
+              <AlertDialog.Header>
+                <AlertDialog.Icon status="danger" />
+                <AlertDialog.Heading>Удалить все старые бэкапы?</AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>
+                <p>
+                  Все резервные копии, кроме самой последней, будут безвозвратно
+                  удалены. Это действие нельзя будет отменить.
+                </p>
+              </AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button slot="close" variant="tertiary" onPress={() => setIsDeleteOldOpen(false)}>
+                  Отмена
+                </Button>
+                <Button variant="danger" onPress={handleConfirmDeleteOld}>
+                  Удалить старые
                 </Button>
               </AlertDialog.Footer>
             </AlertDialog.Dialog>

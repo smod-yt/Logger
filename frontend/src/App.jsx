@@ -7,6 +7,7 @@ import AnalyticsView from "./features/AppTimeView";
 import SessionsView from "./features/SessionsView";
 import ApplicationsView from "./features/ApplicationsView";
 import BackupsView from "./features/BackupsView";
+import SettingsView from "./features/SettingsView";
 
 export default function App() {
   const { isDarkMode, toggleTheme } = useTheme();
@@ -28,6 +29,7 @@ export default function App() {
         {activeTab === "sessions" && <SessionsView />}
         {activeTab === "applications" && <ApplicationsView />}
         {activeTab === "backups" && <BackupsView />}
+        {activeTab === "settings" && <SettingsView />}
       </main>
     </div>
   );
