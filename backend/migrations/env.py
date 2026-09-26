@@ -16,6 +16,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 import os
+import sys
 from pathlib import Path
 
 # add your model's MetaData object here
@@ -25,7 +26,12 @@ from pathlib import Path
 from sqlmodel import SQLModel
 from src.app.models import *
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 target_metadata = SQLModel.metadata
+
+import os
+from pathlib import Path
 
 local_appdata = os.getenv("LOCALAPPDATA")
 if not local_appdata:
@@ -33,6 +39,9 @@ if not local_appdata:
 
 DB_DIR = Path(local_appdata) / "Logger"
 DB_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH = DB_DIR / "database.db"
+BACKUP_DIR = DB_DIR / "backups"
+BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
 config.set_main_option("sqlalchemy.url", f"sqlite+aiosqlite:///{DB_DIR}/database.db")
 

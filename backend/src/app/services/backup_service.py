@@ -13,11 +13,12 @@ local_appdata = os.getenv("LOCALAPPDATA")
 if not local_appdata:
     local_appdata = Path.home() / "AppData" / "Local"
 
-DB_PATH = Path(local_appdata) / "Logger"
-BACKUP_DIR = Path(local_appdata) / "Logger" / "backups"
+DB_DIR = Path(local_appdata) / "Logger"
+DB_PATH = DB_DIR / "database.db"  # файл БД
+BACKUP_DIR = DB_DIR / "backups"  # папка бэкапов
 
-DB_PATH.mkdir(parents=True, exist_ok=True)
-BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+DB_DIR.mkdir(parents=True, exist_ok=True)  # создаём ПАПКУ
+BACKUP_DIR.mkdir(parents=True, exist_ok=True)  # создаём ПАПКУ бэкапов
 
 server_logger = logger.bind(service="server")
 

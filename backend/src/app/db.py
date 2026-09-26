@@ -17,6 +17,9 @@ if not local_appdata:
 
 DB_DIR = Path(local_appdata) / "Logger"
 DB_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH = DB_DIR / "database.db"
+BACKUP_DIR = DB_DIR / "backups"
+BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
 
 server_logger = logger.bind(service="server")
@@ -52,8 +55,16 @@ def _sync_run_migrations():
 async def run_async_migrations():
     result = await asyncio.to_thread(_sync_run_migrations)
 
+    if result.stdout:
+        server_logger.debug(f"Alembic stdout:\n{result.stdout}")
+    if result.stderr:
+        server_logger.warning(f"Alembic stderr:\n{result.stderr}")
+
     if result.returncode != 0:
-        server_logger.error(f"Migration error (code {result.returncode})")
+        server_logger.error(
+            f"Migration error (code {result.returncode})\n"
+            f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+        )
         raise RuntimeError("Alembic migration failed with an error")
-    else:
-        server_logger.info("Migrations have been successfully applied")
+
+    server_logger.info("Migrations have been successfully applied")
