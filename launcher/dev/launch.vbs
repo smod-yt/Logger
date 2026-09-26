@@ -9,5 +9,5 @@ strWatcher = FSO.BuildPath(strVbsFolder, "watcher.py")
 
 WshShell.CurrentDirectory = FSO.BuildPath(strRootFolder, "backend")
 
-WshShell.Run """" & strPython & """ -X logger_server -m uvicorn src.main:app", 0, False
+WshShell.Run """" & strPython & """ -X logger_server -m uvicorn src.main:app --port 8001", 0, False
 WshShell.Run """" & strPython & """ -X logger_watcher """ & strWatcher & """", 0, False
