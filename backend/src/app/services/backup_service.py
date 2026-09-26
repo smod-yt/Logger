@@ -6,6 +6,7 @@ from pathlib import Path
 
 from loguru import logger
 from src.app.schemas.backup_schema import BackupTypes, DeleteBackup, LoadBackup
+from src.app.services import settings_service
 from src.app.utils.exceptions import BackupNotFound, InternalServerError
 
 local_appdata = os.getenv("LOCALAPPDATA")
@@ -56,7 +57,12 @@ def create_backup(
     backup_prefix: BackupTypes = BackupTypes.AUTO.value,
     add_time: bool = False,
     db_path: str = DB_PATH,
+    auto_backup: bool = False,
 ) -> bool:
+    settings = settings_service.get_settings()
+    if settings["enable_auto_backup"] == False and auto_backup == True:
+        return True
+
     server_logger.info(
         f"Initiating backup creation. Prefix: '{backup_prefix}', Add time: {add_time}"
     )
@@ -176,3 +182,53 @@ def delete_backup(backup_name: DeleteBackup) -> bool:
     except Exception as e:
         server_logger.error(f"Failed to delete backup file '{safe_name}': {e}")
         raise InternalServerError()
+
+
+def delete_old_backups():
+    server_logger.debug("Starting cleanup: keeping only the latest backup")
+
+    if not os.path.exists(BACKUP_DIR):
+        server_logger.info("Backup directory does not exist. Nothing to delete")
+        return []
+
+    backups_list = []
+    for filename in os.listdir(BACKUP_DIR):
+        if filename.endswith(".zip"):
+            file_path = os.path.join(BACKUP_DIR, filename)
+            try:
+                file_stat = os.stat(file_path)
+                backups_list.append(
+                    {
+                        "filename": filename,
+                        "path": file_path,
+                        "created_at": file_stat.st_mtime,
+                    }
+                )
+            except Exception as e:
+                server_logger.warning(
+                    f"Failed to read metadata for file {filename}: {e}"
+                )
+                continue
+
+    if len(backups_list) <= 1:
+        server_logger.info(
+            f"Only {len(backups_list)} backup(s) found. Nothing to delete"
+        )
+        return []
+
+    backups_list.sort(key=lambda x: x["created_at"], reverse=True)
+
+    latest_backup = backups_list[0]
+    server_logger.info(f"Keeping latest backup: {latest_backup['filename']}")
+
+    deleted_files = []
+    for backup in backups_list[1:]:
+        try:
+            os.remove(backup["path"])
+            deleted_files.append(backup["filename"])
+            server_logger.info(f"Deleted old backup: {backup['filename']}")
+        except Exception as e:
+            server_logger.warning(f"Failed to delete backup {backup['filename']}: {e}")
+
+    server_logger.debug(f"Cleanup complete. Deleted {len(deleted_files)} backup(s)")
+    return deleted_files

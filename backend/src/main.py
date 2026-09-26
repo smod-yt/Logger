@@ -9,18 +9,18 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from src.app.db import run_async_migrations
 from src.app.services.backup_service import create_backup
-from src.app.utils.logger import create_logs_path
+from src.app.utils.logger import setup_logging
 
 server_logger = logger.bind(service="server")
 
-create_logs_path()
+setup_logging()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await run_async_migrations()
 
-    create_backup(add_time=False)
+    create_backup(add_time=False, auto_backup=True)
 
     server_logger.info("Background backend successfully started")
     yield
