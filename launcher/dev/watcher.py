@@ -1,27 +1,35 @@
+import os
+import sys
+import threading
+import time
+from datetime import datetime
+from pathlib import Path
+
+import psutil
+import requests
+import win32con
 import win32gui
 import win32process
-import win32con
-import win32api
-import os
-import time
-import threading
-from datetime import datetime
-import requests
-import logging
-import psutil
+from loguru import logger
 
-API_URL = "http://127.0.0.1:8000/api/sessions/activity"
+project_root = Path(__file__).resolve().parents[2]
+backend_path = project_root / "backend"
 
-DEV_DIR = os.path.dirname(os.path.abspath(__file__))          
-LOG_FILE = os.path.join(DEV_DIR, "watcher.log")               
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s]: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=[logging.FileHandler(LOG_FILE, encoding="utf-8"), logging.StreamHandler()]
-)
-logger = logging.getLogger("watcher")
+if str(backend_path) not in sys.path:
+    sys.path.insert(0, str(backend_path))
+
+from backend.src.app.utils.logger import setup_logging
+
+API_URL = "http://127.0.0.1:8001/api/sessions/activity"
+
+DEV_DIR = os.path.dirname(os.path.abspath(__file__))
+
+setup_logging()
+
+watcher_logger = logger.bind(service="watcher")
 
 previously_running = set()
 running_lock = threading.Lock()
@@ -32,9 +40,11 @@ def send_event(app_name, event_type, timestamp):
     payload = {"app_name": app_name, "event_type": event_type, "timestamp": timestamp}
     try:
         requests.post(API_URL, json=payload, timeout=3)
-        logger.info(f"App '{app_name}' -> Event: '{event_type}'")
+        watcher_logger.info(f"App '{app_name}' -> Event: '{event_type}'")
     except requests.exceptions.RequestException:
-        logger.warning(f"Failed to send '{event_type}' event for '{app_name}': Server unreachable.")
+        watcher_logger.warning(
+            f"Failed to send '{event_type}' event for '{app_name}': Server unreachable."
+        )
 
 
 def close_all_active_sessions():
@@ -42,7 +52,9 @@ def close_all_active_sessions():
     with running_lock:
         if previously_running:
             now_str = datetime.now().isoformat()
-            logger.info("Closing all active tracked sessions due to sleep/shutdown event...")
+            watcher_logger.info(
+                "Closing all active tracked sessions due to sleep/shutdown event..."
+            )
             for app in list(previously_running):
                 send_event(app, "stop", now_str)
             previously_running.clear()
@@ -57,7 +69,7 @@ def get_real_uwp_exe_name(hwnd):
             _, child_pid = win32process.GetWindowThreadProcessId(child_hwnd)
             proc = psutil.Process(child_pid)
             child_exe = proc.name().lower()
-            
+
             if child_exe not in {"applicationframehost.exe", "runtimebroker.exe"}:
                 real_exe_name = child_exe
                 return False
@@ -76,15 +88,19 @@ def get_running_taskbar_apps():
     running_apps = set()
 
     def enum_windows_callback(hwnd, extra):
-        if not win32gui.IsWindowVisible(hwnd): return True
-        if win32gui.GetWindow(hwnd, win32con.GW_OWNER) != 0: return True
-        
+        if not win32gui.IsWindowVisible(hwnd):
+            return True
+        if win32gui.GetWindow(hwnd, win32con.GW_OWNER) != 0:
+            return True
+
         ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
-        if ex_style & win32con.WS_EX_TOOLWINDOW: return True
-        
+        if ex_style & win32con.WS_EX_TOOLWINDOW:
+            return True
+
         title = win32gui.GetWindowText(hwnd).strip()
-        if not title: return True
-        
+        if not title:
+            return True
+
         try:
             _, pid = win32process.GetWindowThreadProcessId(hwnd)
             proc = psutil.Process(pid)
@@ -109,8 +125,8 @@ def get_running_taskbar_apps():
 
 def tracker_loop():
     global previously_running, is_system_sleeping
-    
-    logger.info("Taskbar applications tracker loop started.")
+
+    watcher_logger.info("Taskbar applications tracker loop started.")
     last_heartbeat_time = 0
     HEARTBEAT_INTERVAL = 10
 
@@ -142,7 +158,7 @@ def tracker_loop():
                 previously_running = current_running
 
         except Exception as e:
-            logger.error(f"Error in tracking cycle: {e}", exc_info=True)
+            watcher_logger.error(f"Error in tracking cycle: {e}", exc_info=True)
 
         time.sleep(2)
 
@@ -152,16 +168,16 @@ def wnd_proc(hwnd, msg, wparam, lparam):
 
     if msg == win32con.WM_POWERBROADCAST:
         if wparam == win32con.PBT_APMSUSPEND:
-            logger.warning("System is going to SLEEP (PBT_APMSUSPEND).")
+            watcher_logger.warning("System is going to SLEEP (PBT_APMSUSPEND).")
             is_system_sleeping = True
             close_all_active_sessions()
 
         elif wparam in (win32con.PBT_APMRESUMESUSPEND, win32con.PBT_APMRESUMEAUTOMATIC):
-            logger.info("System WOKE UP from sleep.")
+            watcher_logger.info("System WOKE UP from sleep.")
             is_system_sleeping = False
 
     elif msg in (win32con.WM_QUERYENDSESSION, win32con.WM_ENDSESSION):
-        logger.warning("System SHUTDOWN / LOGOFF detected.")
+        watcher_logger.warning("System SHUTDOWN / LOGOFF detected.")
         is_system_sleeping = True
         close_all_active_sessions()
         return True
@@ -176,13 +192,10 @@ def start_power_event_listener():
     class_atom = win32gui.RegisterClass(wc)
 
     hwnd = win32gui.CreateWindow(
-        class_atom,
-        "PowerEventWatcher",
-        0, 0, 0, 0, 0,
-        0, 0, 0, None
+        class_atom, "PowerEventWatcher", 0, 0, 0, 0, 0, 0, 0, 0, None
     )
 
-    logger.info("Power event listener window successfully created.")
+    watcher_logger.info("Power event listener window successfully created.")
     win32gui.PumpMessages()
 
 
@@ -193,5 +206,5 @@ if __name__ == "__main__":
     try:
         start_power_event_listener()
     except KeyboardInterrupt:
-        logger.info("Stopping watcher by KeyboardInterrupt.")
+        watcher_logger.info("Stopping watcher by KeyboardInterrupt.")
         close_all_active_sessions()
