@@ -628,11 +628,7 @@ export default function ApplicationsView() {
                 <Button 
                   color="primary" 
                   isLoading={isRegistering} 
-                  onPress={
-                    selectedNewAppIds.length === 0
-                      ? fetchNewApps
-                      : handleRegisterApps
-                  }
+                  onPress={handleRegisterApps}
                 >
                   Добавить выбранные ({selectedNewAppIds.length})
                 </Button>
